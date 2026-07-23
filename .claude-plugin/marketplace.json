@@ -1,0 +1,14 @@
+{
+  "name": "toka-local",
+  "owner": {
+    "name": "toka"
+  },
+  "plugins": [
+    {
+      "name": "discord-extras",
+      "source": "./discord-extras",
+      "description": "Extra Discord tools that the official discord channel plugin doesn't have yet. Companion to (not a replacement for) the official plugin.",
+      "category": "productivity"
+    }
+  ]
+}
