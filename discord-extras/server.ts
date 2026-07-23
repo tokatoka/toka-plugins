@@ -116,6 +116,18 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
       },
     },
     {
+      name: 'delete_thread',
+      description:
+        'PERMANENTLY delete a Discord thread and all its messages. No undo — prefer manage_thread\'s archive action for cleanup. The thread must belong to an allowlisted guild channel, and the bot role needs the "Manage Threads" server permission.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          thread_id: { type: 'string', description: 'Thread ID to permanently delete.' },
+        },
+        required: ['thread_id'],
+      },
+    },
+    {
       name: 'list_threads',
       description:
         'List active (non-archived) threads of an allowlisted guild channel. Returns thread IDs and names — pass a thread ID as chat_id to the discord plugin\'s reply/fetch_messages to talk there.',
@@ -180,6 +192,22 @@ mcp.setRequestHandler(CallToolRequestSchema, async req => {
         const updated = await discord('PATCH', `/channels/${thread_id}`, patch)
         return {
           content: [{ type: 'text', text: `${action} ok — thread "${updated.name}" (id: ${updated.id})` }],
+        }
+      }
+      case 'delete_thread': {
+        const thread_id = args.thread_id as string
+
+        // Same parent-channel gate as manage_thread. Fetch also confirms the
+        // target really is a thread — never allow deleting a plain channel.
+        const ch = await discord('GET', `/channels/${thread_id}`)
+        if (!ch.parent_id || ![10, 11, 12].includes(ch.type)) {
+          throw new Error(`${thread_id} is not a thread — delete_thread refuses non-thread channels`)
+        }
+        assertAllowedGuildChannel(ch.parent_id)
+
+        await discord('DELETE', `/channels/${thread_id}`)
+        return {
+          content: [{ type: 'text', text: `permanently deleted thread "${ch.name}" (id: ${thread_id})` }],
         }
       }
       case 'list_threads': {
