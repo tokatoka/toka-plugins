@@ -69,8 +69,25 @@ function assertAllowedGuildChannel(chatId: string): void {
   }
 }
 
+// Like assertAllowedGuildChannel, but also accepts a thread whose parent is
+// allowlisted (matching the official plugin's outbound gate). Returns the
+// fetched channel object.
+async function fetchAllowedChannelOrThread(chatId: string): Promise<any> {
+  const ch = await discord('GET', `/channels/${chatId}`)
+  const THREAD_TYPES = [10, 11, 12]
+  const gateId = THREAD_TYPES.includes(ch.type) && ch.parent_id ? ch.parent_id : ch.id
+  assertAllowedGuildChannel(gateId)
+  return ch
+}
+
+let botUserId: string | undefined
+async function getBotUserId(): Promise<string> {
+  if (!botUserId) botUserId = (await discord('GET', '/users/@me')).id as string
+  return botUserId
+}
+
 const mcp = new Server(
-  { name: 'discord-extras', version: '0.0.1' },
+  { name: 'discord-extras', version: '0.0.4' },
   {
     capabilities: { tools: {} },
     instructions:
@@ -113,6 +130,52 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
           name: { type: 'string', description: 'New name (rename only, max 100 chars).' },
         },
         required: ['thread_id', 'action'],
+      },
+    },
+    {
+      name: 'send_embed',
+      description:
+        'Send a rich embed message to an allowlisted Discord channel or thread. Embeds have a colored sidebar and support a title, description (markdown), fields, images, and a footer — great for status reports and structured summaries.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          chat_id: { type: 'string', description: 'Channel or thread ID to send to.' },
+          title: { type: 'string', description: 'Embed title (max 256 chars).' },
+          description: { type: 'string', description: 'Embed body, supports markdown (max 4096 chars).' },
+          color: { type: 'string', description: 'Sidebar color as hex, e.g. "#5865F2". Defaults to Discord blurple.' },
+          url: { type: 'string', description: 'Optional URL the title links to.' },
+          fields: {
+            type: 'array',
+            description: 'Up to 25 name/value pairs. inline fields render side by side.',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                value: { type: 'string' },
+                inline: { type: 'boolean' },
+              },
+              required: ['name', 'value'],
+            },
+          },
+          image_url: { type: 'string', description: 'Optional large image URL.' },
+          thumbnail_url: { type: 'string', description: 'Optional small thumbnail image URL.' },
+          footer: { type: 'string', description: 'Optional footer text.' },
+          content: { type: 'string', description: 'Optional plain-text message above the embed.' },
+        },
+        required: ['chat_id'],
+      },
+    },
+    {
+      name: 'delete_message',
+      description:
+        "Delete a message THE BOT ITSELF sent (cleanup of outdated progress updates, accidental spam). Refuses to delete other users' messages. The message must be in an allowlisted channel or thread.",
+      inputSchema: {
+        type: 'object',
+        properties: {
+          chat_id: { type: 'string', description: 'Channel or thread ID containing the message.' },
+          message_id: { type: 'string', description: 'ID of the bot-authored message to delete.' },
+        },
+        required: ['chat_id', 'message_id'],
       },
     },
     {
@@ -193,6 +256,51 @@ mcp.setRequestHandler(CallToolRequestSchema, async req => {
         return {
           content: [{ type: 'text', text: `${action} ok — thread "${updated.name}" (id: ${updated.id})` }],
         }
+      }
+      case 'send_embed': {
+        const chat_id = args.chat_id as string
+        const title = args.title as string | undefined
+        const description = args.description as string | undefined
+        const fields = args.fields as { name: string; value: string; inline?: boolean }[] | undefined
+        if (!title && !description && !fields?.length) {
+          throw new Error('embed needs at least a title, description, or fields')
+        }
+        if (title && title.length > 256) throw new Error('title too long (max 256)')
+        if (description && description.length > 4096) throw new Error('description too long (max 4096)')
+        if (fields && fields.length > 25) throw new Error('too many fields (max 25)')
+
+        const hex = ((args.color as string) ?? '#5865F2').replace(/^#/, '')
+        if (!/^[0-9a-fA-F]{6}$/.test(hex)) throw new Error(`invalid color "${args.color}" — use hex like #5865F2`)
+
+        await fetchAllowedChannelOrThread(chat_id)
+        const embed: Record<string, unknown> = {
+          color: parseInt(hex, 16),
+          ...(title ? { title } : {}),
+          ...(description ? { description } : {}),
+          ...(args.url ? { url: args.url } : {}),
+          ...(fields?.length ? { fields } : {}),
+          ...(args.image_url ? { image: { url: args.image_url } } : {}),
+          ...(args.thumbnail_url ? { thumbnail: { url: args.thumbnail_url } } : {}),
+          ...(args.footer ? { footer: { text: args.footer } } : {}),
+        }
+        const sent = await discord('POST', `/channels/${chat_id}/messages`, {
+          embeds: [embed],
+          ...(args.content ? { content: args.content } : {}),
+        })
+        return { content: [{ type: 'text', text: `embed sent (id: ${sent.id})` }] }
+      }
+      case 'delete_message': {
+        const chat_id = args.chat_id as string
+        const message_id = args.message_id as string
+
+        await fetchAllowedChannelOrThread(chat_id)
+        const msg = await discord('GET', `/channels/${chat_id}/messages/${message_id}`)
+        const me = await getBotUserId()
+        if (msg.author?.id !== me) {
+          throw new Error("refusing: that message wasn't sent by the bot — delete_message only removes the bot's own messages")
+        }
+        await discord('DELETE', `/channels/${chat_id}/messages/${message_id}`)
+        return { content: [{ type: 'text', text: `deleted own message (id: ${message_id})` }] }
       }
       case 'delete_thread': {
         const thread_id = args.thread_id as string

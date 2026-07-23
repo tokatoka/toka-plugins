@@ -1,7 +1,7 @@
 {
   "name": "discord-extras",
-  "description": "Extra Discord thread tools (create, manage, list, delete) — companion to the official discord channel plugin. Shares its token and allowlist state.",
-  "version": "0.0.3",
+  "description": "Extra Discord tools (threads: create/manage/list/delete; messages: send_embed, delete own) — companion to the official discord channel plugin. Shares its token and allowlist state.",
+  "version": "0.0.4",
   "keywords": [
     "discord",
     "threads",
