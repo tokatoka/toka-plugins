@@ -1,6 +1,6 @@
 # toka-plugins
 
-A small [Claude Code](https://claude.com/claude-code) for myself
+A small compilations of [Claude Code](https://claude.com/claude-code) plugins for myself
 
 ## Plugins
 
