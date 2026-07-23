@@ -8,9 +8,13 @@ A small compilations of [Claude Code](https://claude.com/claude-code) plugins fo
 
 Companion to the official [`discord` channel plugin](https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/discord).
 Adds a features the official plugin doesn't have yet. 
-Basically for now, it just adds a functionality to create thread, but I'll add features that I think is useful.
+Basically for now, it just adds a few features like creating threads, deleting messages, (all of which not available with the original plugin). I'll add features that I think is useful.
 
 BTW ofc it's 100% vibe-coded since I know nothing about typescript.
+
+## Warning
+
+Don't use this if you touch confidential info, as this plugin just passes information to Discord. Anything Claude sends through these tools (thread names, embeds, messages) ends up on Discord's servers, subject to their [privacy policy](https://discord.com/privacy). Keep it for hobby/personal use.
 
 ## Install
 
