@@ -97,6 +97,36 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
         required: ['chat_id', 'name'],
       },
     },
+    {
+      name: 'manage_thread',
+      description:
+        'Manage a Discord thread: rename, archive, unarchive, lock, or unlock it. The thread must belong to an allowlisted guild channel. Managing threads the bot did not create requires the bot role to have the "Manage Threads" server permission.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          thread_id: { type: 'string', description: 'Thread ID to manage.' },
+          action: {
+            type: 'string',
+            enum: ['rename', 'archive', 'unarchive', 'lock', 'unlock'],
+            description: 'What to do with the thread.',
+          },
+          name: { type: 'string', description: 'New name (rename only, max 100 chars).' },
+        },
+        required: ['thread_id', 'action'],
+      },
+    },
+    {
+      name: 'list_threads',
+      description:
+        'List active (non-archived) threads of an allowlisted guild channel. Returns thread IDs and names — pass a thread ID as chat_id to the discord plugin\'s reply/fetch_messages to talk there.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          chat_id: { type: 'string', description: 'Parent guild channel ID.' },
+        },
+        required: ['chat_id'],
+      },
+    },
   ],
 }))
 
@@ -123,6 +153,51 @@ mcp.setRequestHandler(CallToolRequestSchema, async req => {
             text: `thread created (id: ${thread.id}) — pass it as chat_id to the discord plugin's reply/fetch_messages to talk there`,
           }],
         }
+      }
+      case 'manage_thread': {
+        const thread_id = args.thread_id as string
+        const action = args.action as string
+        const name = (args.name as string | undefined)?.trim()
+
+        // Gate on the thread's parent channel — same allowlist as everything else.
+        const ch = await discord('GET', `/channels/${thread_id}`)
+        if (!ch.parent_id) throw new Error(`${thread_id} is not a thread`)
+        assertAllowedGuildChannel(ch.parent_id)
+
+        let patch: Record<string, unknown>
+        switch (action) {
+          case 'rename':
+            if (!name) throw new Error('rename requires a name')
+            if (name.length > 100) throw new Error('thread name too long (Discord caps at 100 chars)')
+            patch = { name }
+            break
+          case 'archive': patch = { archived: true }; break
+          case 'unarchive': patch = { archived: false }; break
+          case 'lock': patch = { locked: true }; break
+          case 'unlock': patch = { locked: false }; break
+          default: throw new Error(`unknown action: ${action}`)
+        }
+        const updated = await discord('PATCH', `/channels/${thread_id}`, patch)
+        return {
+          content: [{ type: 'text', text: `${action} ok — thread "${updated.name}" (id: ${updated.id})` }],
+        }
+      }
+      case 'list_threads': {
+        const chat_id = args.chat_id as string
+        assertAllowedGuildChannel(chat_id)
+
+        // Active threads are listed guild-wide; filter to this channel.
+        const parent = await discord('GET', `/channels/${chat_id}`)
+        if (!parent.guild_id) throw new Error(`${chat_id} is not a guild channel`)
+        const { threads } = await discord('GET', `/guilds/${parent.guild_id}/threads/active`)
+        const mine = (threads as any[]).filter(t => t.parent_id === chat_id)
+        const out =
+          mine.length === 0
+            ? '(no active threads)'
+            : mine
+                .map(t => `${t.name}  (id: ${t.id}, ${t.message_count} msgs${t.thread_metadata?.locked ? ', locked' : ''})`)
+                .join('\n')
+        return { content: [{ type: 'text', text: out }] }
       }
       default:
         return {

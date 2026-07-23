@@ -1,6 +1,10 @@
 {
   "name": "discord-extras",
-  "description": "Extra Discord tools (create_thread) — companion to the official discord channel plugin. Shares its token and allowlist state.",
-  "version": "0.0.1",
-  "keywords": ["discord", "threads", "mcp"]
+  "description": "Extra Discord tools (create_thread, manage_thread, list_threads) — companion to the official discord channel plugin. Shares its token and allowlist state.",
+  "version": "0.0.2",
+  "keywords": [
+    "discord",
+    "threads",
+    "mcp"
+  ]
 }
