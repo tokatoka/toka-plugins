@@ -1,25 +1,21 @@
 # toka-plugins
 
-A small [Claude Code](https://claude.com/claude-code) plugin marketplace.
+A small [Claude Code](https://claude.com/claude-code) for myself
 
 ## Plugins
 
 ### discord-extras
 
-Companion to the official [`discord` channel plugin](https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/discord) — adds tools the official plugin doesn't have yet. It is **not** a replacement: keep the official plugin installed for messaging (only official channel plugins get inbound-message and permission-relay powers).
+Companion to the official [`discord` channel plugin](https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/discord).
+Adds a features the official plugin doesn't have yet. 
+Basically for now, it just adds a functionality to create thread, but I'll add features that I think is useful.
 
-**Tools:**
-
-- `create_thread(chat_id, name, message_id?)` — create a thread in an allowlisted guild channel, standalone or anchored to an existing message. Returns the thread ID; pass it as `chat_id` to the official plugin's `reply`/`fetch_messages` to talk in the thread. (Tracking upstream: [claude-plugins-official#1144](https://github.com/anthropics/claude-plugins-official/issues/1144))
-
-**Design:**
-
-- Tools-only MCP server over Discord's REST API — no gateway connection, no duplicate bot session
-- Shares the official plugin's state in `~/.claude/channels/discord/`: same `DISCORD_BOT_TOKEN` (from `.env`) and the same `access.json` allowlist, so it can only reach channels you approved via `/discord:access`
+BTW ofc it's 100% vibe-coded since I know nothing about typescript.
 
 ## Install
 
 Requires [bun](https://bun.sh) and a working install of the official `discord` plugin (configured via `/discord:configure`).
+See [this](https://code.claude.com/docs/en/channels#discord)
 
 ```
 /plugin marketplace add <path-or-git-url-of-this-repo>
